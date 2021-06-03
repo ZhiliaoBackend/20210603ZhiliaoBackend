@@ -1,3 +1,4 @@
 frp/
 *.backup/
 *.pyproj
+__pycache__
