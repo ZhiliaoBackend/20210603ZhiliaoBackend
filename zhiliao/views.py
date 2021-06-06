@@ -25,7 +25,7 @@ class SubmitView(View):
             res_dict['error'] = {'err_code':0,'err_msg':'success'}
             res = JsonResponse(res_dict)
         else:
-            res_dict['error'] = {'err_code':0,'err_msg':'success'}
+            res_dict['error'] = {'err_code':1,'err_msg':repr(exception)}
             res = JsonResponse(res_dict)
             res.status_code = 400
         return res
