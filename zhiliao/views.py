@@ -4,6 +4,10 @@ from django.views import View
 import numpy as np
 from PIL import Image
 from io import BytesIO
+from . import detect
+
+detection = detect.Detection("best.pt")
+
 
 class SubmitView(View):
 
@@ -13,8 +17,9 @@ class SubmitView(View):
         try:
             img_obj = request.FILES['image']
             img = np.array(Image.open(BytesIO(img_obj.read())))
-            res_dict['cols'] = img.shape[0]
-            res_dict['rows'] = img.shape[1]
+            pred = detection.detect(img)
+            res_dict['eye_open'] = pred.eye_open
+            res_dict['mouth_open'] = pred.mouth_open
             self.handle_exception(res_dict)
         except Exception as err:
             exception = err
@@ -28,4 +33,5 @@ class SubmitView(View):
             res_dict['error'] = {'err_code':1,'err_msg':repr(exception)}
             res = JsonResponse(res_dict)
             res.status_code = 400
+
         return res
