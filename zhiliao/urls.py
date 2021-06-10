@@ -18,4 +18,5 @@ from . import views
 
 urlpatterns = [
     path('submit', views.SubmitView.as_view()),
+    path('driverInfo',views.DriverView.as_view())
 ]

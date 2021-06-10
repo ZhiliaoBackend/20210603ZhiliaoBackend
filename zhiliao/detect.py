@@ -9,26 +9,12 @@ import torch.nn as nn
 import math
 import numpy as np
 
-import logging
-logging.basicConfig(format="%(message)s",level=logging.WARN)
-
 
 def select_device(device='', batch_size=None):
-    # device = 'cpu' or '0' or '0,1,2,3'
-    cpu = device.lower() == 'cpu'
-    if cpu:
-        os.environ['CUDA_VISIBLE_DEVICES'] = '-1'  # force torch.cuda.is_available() = False
-    elif device:  # non-cpu device requested
-        os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
-        assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
-
-    cuda = not cpu and torch.cuda.is_available()
-    if cuda:
-        n = torch.cuda.device_count()
-        if n > 1 and batch_size:  # check that batch_size is compatible with device_count
-            assert batch_size % n == 0, f'batch-size {batch_size} not multiple of GPU count {n}'
-
-    return torch.device('cuda:0' if cuda else 'cpu')
+    os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
+    assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
+    cuda = 'cuda:0'
+    return torch.device(cuda)
 
 
 def time_synchronized():
@@ -40,7 +26,6 @@ def time_synchronized():
 def attempt_load(weights, map_location=None):
     ckpt = torch.load(weights, map_location=map_location)  # load
     model = ckpt['model'].float().fuse().eval()  # FP32 model
-
     return model
 
 
@@ -193,8 +178,8 @@ class PredictRes(object):
     __slots__ = ['eye_open','mouth_open']
 
     def __init__(self):
-        self.eye_open = None
-        self.mouth_open = None
+        self.eye_abnormal = None  # True if eye is closed
+        self.mouth_abnormal = None  # True if mouth is opened
 
 
 class Detection(object):
@@ -202,16 +187,13 @@ class Detection(object):
     __slots__ = ['device', 'model', 'stride', 'img_size', 'names']
 
     def __init__(self, weights, img_size=640):
-        pass
-
         # Initialize
         self.device = select_device('0')
 
         # Load model
-        self.model = attempt_load(weights, map_location=self.device)  # load FP32 model
+        self.model = attempt_load(weights, map_location=self.device).half()  # load FP16 model
         self.stride = int(self.model.stride.max())  # model stride
         self.img_size = check_img_size(img_size, s=self.stride)  # check img_size
-        self.model.half()  # to FP16
 
         # Get names
         self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names
@@ -253,12 +235,12 @@ class Detection(object):
         for confidence,idx in pred_array:
             idx = int(idx)
             if idx == 0:
-                pred.eye_open = True
-            elif idx == 1 and pred.eye_open is not True:
-                pred.eye_open = False
+                pred.eye_abnormal = False
+            elif idx == 1 and pred.eye_abnormal is not True:
+                pred.eye_abnormal = True
             elif idx == 2:
-                pred.mouth_open = True
-            elif idx == 3 and pred.mouth_open is not True:
-                pred.mouth_open = False
+                pred.mouth_abnormal = True
+            elif idx == 3 and pred.mouth_abnormal is not True:
+                pred.mouth_abnormal = False
 
         return pred
