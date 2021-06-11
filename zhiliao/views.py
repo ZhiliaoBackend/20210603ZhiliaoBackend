@@ -26,6 +26,8 @@ class SubmitView(View):
             img_obj = request.FILES['image']
             img = np.array(Image.open(BytesIO(img_obj.read())))
             pred = detection.detect(img)
+            res_dict['eye_abnormal'] = pred.eye_abnormal
+            res_dict['mouth_abnormal'] = pred.mouth_abnormal
             token = request.POST['driver_token']
             db.submit(token,pred)
         except Exception as err:
