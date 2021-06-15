@@ -8,8 +8,9 @@ from django.http import JsonResponse
 from django.views import View
 
 #from .  import detect
-from . import detect_debug
-detection = detect_debug.Detection("./zhiliao/best.pt")
+from . import detect
+detection = detect.Detection("./models/best.pt")
+enlightenGAN = detect.init_enlightenGAN()
 
 from . import database
 db = database.Database()
@@ -18,14 +19,13 @@ db = database.Database()
 
 class SubmitView(View):
 
-
     def post(self,request):
         res_dict = dict()
         exception = None
         try:
             img_obj = request.FILES['image']
             img = np.array(Image.open(BytesIO(img_obj.read())))
-            pred = detection.detect(img)
+            pred = detection.detect(enlightenGAN.predict(img))
             res_dict['eye_abnormal'] = pred.eye_abnormal
             res_dict['mouth_abnormal'] = pred.mouth_abnormal
             token = request.POST['driver_token']

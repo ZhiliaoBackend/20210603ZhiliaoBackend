@@ -10,6 +10,62 @@ import math
 import numpy as np
 
 
+def init_enlightenGAN():
+    from .enlighten.models.single_model import SingleModel
+    import argparse
+    opt_dict = {
+        'gpu_ids':[0],
+        'checkpoints_dir':'./zhiliao/enlighten/checkpoints',
+        'which_model_netG':'sid_unet_resize',
+        'name':'enlightening',
+        'resize_or_crop':'no',
+        'isTrain':False,
+        'no_dropout':True,
+        'no_flip':True,
+        'loadSize':286,
+        'fineSize':256,
+        'batchSize':1,
+        'input_nc':3,
+        'output_nc':3,
+        'vgg':0,
+        'vgg_mean':None,
+        'IN_vgg':None,
+        'fcn':0,
+        'skip':1,
+        'ngf':64,
+        'use_norm':1,
+        'norm':'instance',
+        'which_epoch':200,
+        'patchD':None,
+        'patchD_3':0,
+        'vary':1,
+        'low_times':200,
+        'high_times':400,
+        'noise':0,
+        'input_linear':None,
+        'use_wgan':0,
+        'use_ragan':None,
+        'hybrid_loss':None,
+        'D_P_times2':None,
+        'new_lr':None,
+        'lr':None,
+        'niter_decay':None,
+        'self_attention':True,
+        'syn_norm':False,
+        'use_avgpool':0,
+        'tanh':False,
+        'times_residual':True,
+        'linear_add':False,
+        'linear':False,
+        'latent_threshold':False,
+        'latent_norm':False,
+        }
+    opt = argparse.Namespace(**opt_dict)
+    model = SingleModel()
+    model.initialize(opt)
+    return model
+
+
 def select_device(device='', batch_size=None):
     os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
     assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
@@ -59,14 +115,14 @@ def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scale
     top, bottom = int(round(dh - 0.1)), int(round(dh + 0.1))
     left, right = int(round(dw - 0.1)), int(round(dw + 0.1))
     img = cv2.copyMakeBorder(img, top, bottom, left, right, cv2.BORDER_CONSTANT, value=color)  # add border
-    return img, ratio, (dw, dh)
+    return img
 
 
 def check_img_size(img_size, s=32):
     # Verify img_size is a multiple of stride s
     new_size = math.ceil(img_size / int(s)) * int(s)  # ceil gs-multiple
     if new_size != img_size:
-        print('WARNING: --img-size %g must be multiple of max stride %g, updating to %g' % (img_size, s, new_size))
+        print(f"WARNING: --img-size {img_size} must be multiple of max stride {s}, updating to {new_size}")
     return new_size
 
 
@@ -105,8 +161,6 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
     output = [torch.zeros((0, 6), device=prediction.device)] * prediction.shape[0]
     for xi, x in enumerate(prediction):  # image index, image inference
         # Apply constraints
-                                               # x[((x[..., 2:4] < min_wh) | (x[..., 2:4] > max_wh)).any(1), 4] = 0 #
-                                               # width-height
         x = x[xc[xi]]  # confidence
 
         # Cat apriori labels if autolabelling
@@ -175,7 +229,7 @@ def non_max_suppression(prediction, conf_thres=0.25, iou_thres=0.45, classes=Non
 
 class PredictRes(object):
 
-    __slots__ = ['eye_open','mouth_open']
+    __slots__ = ['eye_abnormal','mouth_abnormal']
 
     def __init__(self):
         self.eye_abnormal = None  # True if eye is closed
@@ -211,7 +265,7 @@ class Detection(object):
             pred: PredictRes
         """
         # Padded resize
-        img = letterbox(img, self.img_size, stride=self.stride)[0]
+        img = letterbox(img, self.img_size, stride=self.stride)
 
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
