@@ -1,9 +1,8 @@
-import datetime as dt
-
 from django.db import models
 
+
 class DriverBase(models.Model):
-    user_id = models.PositiveIntegerField(primary_key=True)
+    user_id = models.AutoField(primary_key=True)
     start_time = models.DateTimeField()
     eval_time_milisec = models.PositiveIntegerField(default=0)
     eye_abnormal_milisec = models.PositiveIntegerField(default=0)
@@ -15,12 +14,16 @@ class DriverBase(models.Model):
 
 class DriverDetect(models.Model):
     record_id = models.BigAutoField(primary_key=True)
-    driver_base = models.ForeignKey(to="DriverBase",to_field='user_id',related_name='records',on_delete=models.CASCADE)
     record_time = models.DateTimeField()
     eye_abnormal = models.BooleanField(default=False)
     mouth_abnormal = models.BooleanField(default=False)
 
 
-class DriverLoginInfo(models.Model):
-    token = models.CharField(max_length=32,primary_key=True)
-    driver_base = models.ForeignKey(to="DriverBase",to_field='user_id',related_name='login_infos',on_delete=models.CASCADE)
+class Task(models.Model):
+    task_id = models.BigAutoField(primary_key=True)
+    ori_name=models.CharField(max_length=32)
+    ori_WE=models.DecimalField(max_digits=9,decimal_places=6)
+    ori_NS=models.DecimalField(max_digits=9,decimal_places=6)
+    dst_name=models.CharField(max_length=32)
+    dst_WE=models.DecimalField(max_digits=9,decimal_places=6)
+    dst_NS=models.DecimalField(max_digits=9,decimal_places=6)

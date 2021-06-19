@@ -22,18 +22,16 @@ def get_transform(opt):
         return img.resize((w, h), Image.BICUBIC)
     transform_list = []
     if opt.resize_or_crop == 'resize_and_crop':
-        zoom = 1 + 0.1*radom.randint(0,4)
-        osize = [int(400*zoom), int(600*zoom)]
+        zoom = 1 + 0.1 * radom.randint(0,4)
+        osize = [int(400 * zoom), int(600 * zoom)]
         transform_list.append(transforms.Scale(osize, Image.BICUBIC))
         transform_list.append(transforms.RandomCrop(opt.fineSize))
     elif opt.resize_or_crop == 'crop':
         transform_list.append(transforms.RandomCrop(opt.fineSize))
     elif opt.resize_or_crop == 'scale_width':
-        transform_list.append(transforms.Lambda(
-            lambda img: __scale_width(img, opt.fineSize)))
+        transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.fineSize)))
     elif opt.resize_or_crop == 'scale_width_and_crop':
-        transform_list.append(transforms.Lambda(
-            lambda img: __scale_width(img, opt.loadSize)))
+        transform_list.append(transforms.Lambda(lambda img: __scale_width(img, opt.loadSize)))
         transform_list.append(transforms.RandomCrop(opt.fineSize))  
     # elif opt.resize_or_crop == 'no':
     #     osize = [384, 512]
@@ -59,11 +57,8 @@ def tensor2im(image_tensor, imtype=np.uint8):
 
 
 class SingleModel(BaseModel):
-    def name(self):
-        return 'SingleGANModel'
-
-    def initialize(self, opt):
-        BaseModel.initialize(self, opt)
+    def __init__(self, opt):
+        super().__init__(opt)
 
         nb = opt.batchSize
         size = opt.fineSize
@@ -71,7 +66,7 @@ class SingleModel(BaseModel):
         self.input_A = self.Tensor(nb, opt.input_nc, size, size)
         self.input_img = self.Tensor(nb, opt.input_nc, size, size)
         self.input_A_gray = self.Tensor(nb, 1, size, size)
-        self.transform=get_transform(opt)
+        self.transform = get_transform(opt)
 
         if opt.vgg > 0:
             self.vgg_loss = networks.PerceptualLoss(opt)
@@ -112,8 +107,8 @@ class SingleModel(BaseModel):
         A_img = self.transform(A_img)
 
         if self.opt.resize_or_crop == 'no':
-            r,g,b = A_img[0]+1, A_img[1]+1, A_img[2]+1
-            A_gray = 1. - (0.299*r+0.587*g+0.114*b)/2.
+            r,g,b = A_img[0] + 1, A_img[1] + 1, A_img[2] + 1
+            A_gray = 1. - (0.299 * r + 0.587 * g + 0.114 * b) / 2.
             input_img = A_img
             # A_gray = (1./A_gray)/255.
         else:
@@ -129,14 +124,14 @@ class SingleModel(BaseModel):
                 idx = torch.LongTensor(idx)
                 A_img = A_img.index_select(1, idx)
             if self.opt.vary == 1 and (not self.opt.no_flip) and random.random() < 0.5:
-                times = random.randint(self.opt.low_times,self.opt.high_times)/100.
-                input_img = (A_img+1)/2./times
-                input_img = input_img*2-1
+                times = random.randint(self.opt.low_times,self.opt.high_times) / 100.
+                input_img = (A_img + 1) / 2. / times
+                input_img = input_img * 2 - 1
             else:
                 input_img = A_img
-            r,g,b = input_img[0]+1, input_img[1]+1, input_img[2]+1
+            r,g,b = input_img[0] + 1, input_img[1] + 1, input_img[2] + 1
 
-        A_gray = 1. - (0.299*r+0.587*g+0.114*b)/2.
+        A_gray = 1. - (0.299 * r + 0.587 * g + 0.114 * b) / 2.
         A_gray = A_gray.unsqueeze(0).unsqueeze(0)
         A_img = A_img.unsqueeze(0)
         input_img = input_img.unsqueeze(0)
@@ -148,10 +143,10 @@ class SingleModel(BaseModel):
         self.real_A = Variable(self.input_A)
         self.real_A_gray = Variable(self.input_A_gray)
         if self.opt.noise > 0:
-            self.noise = Variable(torch.cuda.FloatTensor(self.real_A.size()).normal_(mean=0, std=self.opt.noise/255.))
+            self.noise = Variable(torch.cuda.FloatTensor(self.real_A.size()).normal_(mean=0, std=self.opt.noise / 255.))
             self.real_A = self.real_A + self.noise
         if self.opt.input_linear:
-            self.real_A = (self.real_A - torch.min(self.real_A))/(torch.max(self.real_A) - torch.min(self.real_A))
+            self.real_A = (self.real_A - torch.min(self.real_A)) / (torch.max(self.real_A) - torch.min(self.real_A))
         if self.opt.skip == 1:
             self.fake_B, self.latent_real_A = self.netG_A.forward(self.real_A, self.real_A_gray)
         else:
@@ -172,8 +167,7 @@ class SingleModel(BaseModel):
             loss_D = loss_D_fake - loss_D_real + self.criterionGAN.calc_gradient_penalty(netD, 
                                                 real.data, fake.data)
         elif self.opt.use_ragan and use_ragan:
-            loss_D = (self.criterionGAN(pred_real - torch.mean(pred_fake), True) +
-                                      self.criterionGAN(pred_fake - torch.mean(pred_real), False)) / 2
+            loss_D = (self.criterionGAN(pred_real - torch.mean(pred_fake), True) + self.criterionGAN(pred_fake - torch.mean(pred_real), False)) / 2
         else:
             loss_D_real = self.criterionGAN(pred_real, True)
             loss_D_fake = self.criterionGAN(pred_fake, False)
@@ -193,7 +187,7 @@ class SingleModel(BaseModel):
             if self.opt.patchD_3 > 0:
                 for i in range(self.opt.patchD_3):
                     loss_D_P += self.backward_D_basic(self.netD_P, self.real_patch_1[i], self.fake_patch_1[i], False)
-                self.loss_D_P = loss_D_P/float(self.opt.patchD_3 + 1)
+                self.loss_D_P = loss_D_P / float(self.opt.patchD_3 + 1)
             else:
                 self.loss_D_P = loss_D_P
         else:
@@ -201,26 +195,27 @@ class SingleModel(BaseModel):
             if self.opt.patchD_3 > 0:
                 for i in range(self.opt.patchD_3):
                     loss_D_P += self.backward_D_basic(self.netD_P, self.real_patch_1[i], self.fake_patch_1[i], True)
-                self.loss_D_P = loss_D_P/float(self.opt.patchD_3 + 1)
+                self.loss_D_P = loss_D_P / float(self.opt.patchD_3 + 1)
             else:
                 self.loss_D_P = loss_D_P
         if self.opt.D_P_times2:
-            self.loss_D_P = self.loss_D_P*2
+            self.loss_D_P = self.loss_D_P * 2
         self.loss_D_P.backward()
 
     # def backward_D_B(self):
     #     fake_A = self.fake_A_pool.query(self.fake_A)
-    #     self.loss_D_B = self.backward_D_basic(self.netD_B, self.real_A, fake_A)
+    #     self.loss_D_B = self.backward_D_basic(self.netD_B, self.real_A,
+    #     fake_A)
     def forward(self):
         self.real_A = Variable(self.input_A)
         self.real_B = Variable(self.input_B)
         self.real_A_gray = Variable(self.input_A_gray)
         self.real_img = Variable(self.input_img)
         if self.opt.noise > 0:
-            self.noise = Variable(torch.cuda.FloatTensor(self.real_A.size()).normal_(mean=0, std=self.opt.noise/255.))
+            self.noise = Variable(torch.cuda.FloatTensor(self.real_A.size()).normal_(mean=0, std=self.opt.noise / 255.))
             self.real_A = self.real_A + self.noise
         if self.opt.input_linear:
-            self.real_A = (self.real_A - torch.min(self.real_A))/(torch.max(self.real_A) - torch.min(self.real_A))
+            self.real_A = (self.real_A - torch.min(self.real_A)) / (torch.max(self.real_A) - torch.min(self.real_A))
         if self.opt.skip == 1:
             self.fake_B, self.latent_real_A = self.netG_A.forward(self.real_img, self.real_A_gray)
         else:
@@ -253,13 +248,18 @@ class SingleModel(BaseModel):
                 self.input_patch_1.append(self.real_A[:,:, h_offset_1:h_offset_1 + self.opt.patchSize,
                     w_offset_1:w_offset_1 + self.opt.patchSize])
 
-            # w_offset_2 = random.randint(0, max(0, w - self.opt.patchSize - 1))
-            # h_offset_2 = random.randint(0, max(0, h - self.opt.patchSize - 1))
-            # self.fake_patch_2 = self.fake_B[:,:, h_offset_2:h_offset_2 + self.opt.patchSize,
+            # w_offset_2 = random.randint(0, max(0, w - self.opt.patchSize -
+            # 1))
+            # h_offset_2 = random.randint(0, max(0, h - self.opt.patchSize -
+            # 1))
+            # self.fake_patch_2 = self.fake_B[:,:, h_offset_2:h_offset_2 +
+            # self.opt.patchSize,
             #        w_offset_2:w_offset_2 + self.opt.patchSize]
-            # self.real_patch_2 = self.real_B[:,:, h_offset_2:h_offset_2 + self.opt.patchSize,
+            # self.real_patch_2 = self.real_B[:,:, h_offset_2:h_offset_2 +
+            # self.opt.patchSize,
             #        w_offset_2:w_offset_2 + self.opt.patchSize]
-            # self.input_patch_2 = self.real_A[:,:, h_offset_2:h_offset_2 + self.opt.patchSize,
+            # self.input_patch_2 = self.real_A[:,:, h_offset_2:h_offset_2 +
+            # self.opt.patchSize,
             #        w_offset_2:w_offset_2 + self.opt.patchSize]
 
     def backward_G(self, epoch):
@@ -269,8 +269,7 @@ class SingleModel(BaseModel):
         elif self.opt.use_ragan:
             pred_real = self.netD_A.forward(self.real_B)
 
-            self.loss_G_A = (self.criterionGAN(pred_real - torch.mean(pred_fake), False) +
-                                      self.criterionGAN(pred_fake - torch.mean(pred_real), True)) / 2
+            self.loss_G_A = (self.criterionGAN(pred_real - torch.mean(pred_fake), False) + self.criterionGAN(pred_fake - torch.mean(pred_real), True)) / 2
             
         else:
             self.loss_G_A = self.criterionGAN(pred_fake, True)
@@ -283,8 +282,7 @@ class SingleModel(BaseModel):
             else:
                 pred_real_patch = self.netD_P.forward(self.real_patch)
                 
-                loss_G_A += (self.criterionGAN(pred_real_patch - torch.mean(pred_fake_patch), False) +
-                                      self.criterionGAN(pred_fake_patch - torch.mean(pred_real_patch), True)) / 2
+                loss_G_A += (self.criterionGAN(pred_real_patch - torch.mean(pred_fake_patch), False) + self.criterionGAN(pred_fake_patch - torch.mean(pred_real_patch), True)) / 2
         if self.opt.patchD_3 > 0:   
             for i in range(self.opt.patchD_3):
                 pred_fake_patch_1 = self.netD_P.forward(self.fake_patch_1[i])
@@ -293,18 +291,17 @@ class SingleModel(BaseModel):
                 else:
                     pred_real_patch_1 = self.netD_P.forward(self.real_patch_1[i])
                     
-                    loss_G_A += (self.criterionGAN(pred_real_patch_1 - torch.mean(pred_fake_patch_1), False) +
-                                        self.criterionGAN(pred_fake_patch_1 - torch.mean(pred_real_patch_1), True)) / 2
+                    loss_G_A += (self.criterionGAN(pred_real_patch_1 - torch.mean(pred_fake_patch_1), False) + self.criterionGAN(pred_fake_patch_1 - torch.mean(pred_real_patch_1), True)) / 2
                     
             if not self.opt.D_P_times2:
-                self.loss_G_A += loss_G_A/float(self.opt.patchD_3 + 1)
+                self.loss_G_A += loss_G_A / float(self.opt.patchD_3 + 1)
             else:
-                self.loss_G_A += loss_G_A/float(self.opt.patchD_3 + 1)*2
+                self.loss_G_A += loss_G_A / float(self.opt.patchD_3 + 1) * 2
         else:
             if not self.opt.D_P_times2:
                 self.loss_G_A += loss_G_A
             else:
-                self.loss_G_A += loss_G_A*2
+                self.loss_G_A += loss_G_A * 2
                 
         if epoch < 0:
             vgg_w = 0
@@ -328,10 +325,10 @@ class SingleModel(BaseModel):
                         else:
                             loss_vgg_patch += self.vgg_patch_loss.compute_vgg_loss(self.vgg, 
                                 self.fake_patch_1[i], self.input_patch_1[i]) * self.opt.vgg
-                    self.loss_vgg_b += loss_vgg_patch/float(self.opt.patchD_3 + 1)
+                    self.loss_vgg_b += loss_vgg_patch / float(self.opt.patchD_3 + 1)
                 else:
                     self.loss_vgg_b += loss_vgg_patch
-            self.loss_G = self.loss_G_A + self.loss_vgg_b*vgg_w
+            self.loss_G = self.loss_G_A + self.loss_vgg_b * vgg_w
         elif self.opt.fcn > 0:
             self.loss_fcn_b = self.fcn_loss.compute_fcn_loss(self.fcn, 
                     self.fake_B, self.real_A) * self.opt.fcn if self.opt.fcn > 0 else 0
@@ -342,10 +339,10 @@ class SingleModel(BaseModel):
                     for i in range(self.opt.patchD_3):
                         loss_fcn_patch += self.fcn_loss.compute_vgg_loss(self.fcn, 
                             self.fake_patch_1[i], self.input_patch_1[i]) * self.opt.fcn
-                    self.loss_fcn_b += loss_fcn_patch/float(self.opt.patchD_3 + 1)
+                    self.loss_fcn_b += loss_fcn_patch / float(self.opt.patchD_3 + 1)
                 else:
                     self.loss_fcn_b += loss_fcn_patch
-            self.loss_G = self.loss_G_A + self.loss_fcn_b*vgg_w
+            self.loss_G = self.loss_G_A + self.loss_fcn_b * vgg_w
         # self.loss_G = self.L1_AB + self.L1_BA
         self.loss_G.backward()
 
@@ -395,10 +392,10 @@ class SingleModel(BaseModel):
         D_P = self.loss_D_P.data[0] if self.opt.patchD else 0
         G_A = self.loss_G_A.data[0]
         if self.opt.vgg > 0:
-            vgg = self.loss_vgg_b.data[0]/self.opt.vgg if self.opt.vgg > 0 else 0
+            vgg = self.loss_vgg_b.data[0] / self.opt.vgg if self.opt.vgg > 0 else 0
             return OrderedDict([('D_A', D_A), ('G_A', G_A), ("vgg", vgg), ("D_P", D_P)])
         elif self.opt.fcn > 0:
-            fcn = self.loss_fcn_b.data[0]/self.opt.fcn if self.opt.fcn > 0 else 0
+            fcn = self.loss_fcn_b.data[0] / self.opt.fcn if self.opt.fcn > 0 else 0
             return OrderedDict([('D_A', D_A), ('G_A', G_A), ("fcn", fcn), ("D_P", D_P)])
         
     def save(self, label):
@@ -412,7 +409,7 @@ class SingleModel(BaseModel):
     def update_learning_rate(self):
         
         if self.opt.new_lr:
-            lr = self.old_lr/2
+            lr = self.old_lr / 2
         else:
             lrd = self.opt.lr / self.opt.niter_decay
             lr = self.old_lr - lrd

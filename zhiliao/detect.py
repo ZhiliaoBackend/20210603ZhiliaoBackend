@@ -1,88 +1,17 @@
 import os
 import time
 from pathlib import Path
+import argparse
 
-import cv2
 import torch
 import torchvision
 import torch.nn as nn
+
+import cv2
 import math
 import numpy as np
 
-
-def init_enlightenGAN():
-    from .enlighten.models.single_model import SingleModel
-    import argparse
-    opt_dict = {
-        'gpu_ids':[0],
-        'checkpoints_dir':'./zhiliao/enlighten/checkpoints',
-        'which_model_netG':'sid_unet_resize',
-        'name':'enlightening',
-        'resize_or_crop':'no',
-        'isTrain':False,
-        'no_dropout':True,
-        'no_flip':True,
-        'loadSize':286,
-        'fineSize':256,
-        'batchSize':1,
-        'input_nc':3,
-        'output_nc':3,
-        'vgg':0,
-        'vgg_mean':None,
-        'IN_vgg':None,
-        'fcn':0,
-        'skip':1,
-        'ngf':64,
-        'use_norm':1,
-        'norm':'instance',
-        'which_epoch':200,
-        'patchD':None,
-        'patchD_3':0,
-        'vary':1,
-        'low_times':200,
-        'high_times':400,
-        'noise':0,
-        'input_linear':None,
-        'use_wgan':0,
-        'use_ragan':None,
-        'hybrid_loss':None,
-        'D_P_times2':None,
-        'new_lr':None,
-        'lr':None,
-        'niter_decay':None,
-        'self_attention':True,
-        'syn_norm':False,
-        'use_avgpool':0,
-        'tanh':False,
-        'times_residual':True,
-        'linear_add':False,
-        'linear':False,
-        'latent_threshold':False,
-        'latent_norm':False,
-        }
-    opt = argparse.Namespace(**opt_dict)
-    model = SingleModel()
-    model.initialize(opt)
-    return model
-
-
-def select_device(device='', batch_size=None):
-    os.environ['CUDA_VISIBLE_DEVICES'] = device  # set environment variable
-    assert torch.cuda.is_available(), f'CUDA unavailable, invalid device {device} requested'  # check availability
-    cuda = 'cuda:0'
-    return torch.device(cuda)
-
-
-def time_synchronized():
-    # pytorch-accurate time
-    if torch.cuda.is_available():
-        torch.cuda.synchronize()
-
-
-def attempt_load(weights, map_location=None):
-    ckpt = torch.load(weights, map_location=map_location)  # load
-    model = ckpt['model'].float().fuse().eval()  # FP32 model
-    return model
+from .enlighten.models.single_model import SingleModel
 
 
 def letterbox(img, new_shape=(640, 640), color=(114, 114, 114), auto=True, scaleFill=False, scaleup=True, stride=32):
@@ -238,19 +167,70 @@ class PredictRes(object):
 
 class Detection(object):
 
-    __slots__ = ['device', 'model', 'stride', 'img_size', 'names']
+    __slots__ = ['device', 'model_yolo', 'model_egan', 'stride', 'img_size', 'names']
 
-    def __init__(self, weights, img_size=640):
+    def __init__(self):
         # Initialize
-        self.device = select_device('0')
+        os.environ['CUDA_VISIBLE_DEVICES'] = '0'  # set environment variable
+        self.device = torch.device('cuda:0')
 
         # Load model
-        self.model = attempt_load(weights, map_location=self.device).half()  # load FP16 model
-        self.stride = int(self.model.stride.max())  # model stride
-        self.img_size = check_img_size(img_size, s=self.stride)  # check img_size
+        ckpt = torch.load("./models/best.pt", map_location=self.device)  # load
+        self.model_yolo = ckpt['model'].float().fuse().eval().half()
+        opt_dict = {
+            'gpu_ids':[0],
+            'checkpoints_dir':'./zhiliao/enlighten/checkpoints',
+            'which_model_netG':'sid_unet_resize',
+            'name':'enlightening',
+            'resize_or_crop':'no',
+            'isTrain':False,
+            'no_dropout':True,
+            'no_flip':True,
+            'loadSize':286,
+            'fineSize':256,
+            'batchSize':1,
+            'input_nc':3,
+            'output_nc':3,
+            'vgg':0,
+            'vgg_mean':None,
+            'IN_vgg':None,
+            'fcn':0,
+            'skip':1,
+            'ngf':64,
+            'use_norm':1,
+            'norm':'instance',
+            'which_epoch':200,
+            'patchD':None,
+            'patchD_3':0,
+            'vary':1,
+            'low_times':200,
+            'high_times':400,
+            'noise':0,
+            'input_linear':None,
+            'use_wgan':0,
+            'use_ragan':None,
+            'hybrid_loss':None,
+            'D_P_times2':None,
+            'new_lr':None,
+            'lr':None,
+            'niter_decay':None,
+            'self_attention':True,
+            'syn_norm':False,
+            'use_avgpool':0,
+            'tanh':False,
+            'times_residual':True,
+            'linear_add':False,
+            'linear':False,
+            'latent_threshold':False,
+            'latent_norm':False,
+            }
+        opt = argparse.Namespace(**opt_dict)
+        self.model_egan = SingleModel(opt)
+        self.stride = int(self.model_yolo.stride.max())  # model stride
+        self.img_size = check_img_size(640, s=self.stride)  # check img_size
 
         # Get names
-        self.names = self.model.module.names if hasattr(self.model, 'module') else self.model.names
+        self.names = self.model_yolo.module.names if hasattr(self.model_yolo, 'module') else self.model_yolo.names
 
     @torch.no_grad()
     def detect(self, img):
@@ -267,6 +247,9 @@ class Detection(object):
         # Padded resize
         img = letterbox(img, self.img_size, stride=self.stride)
 
+        # Enlighten
+        img = self.model_egan.predict(img)
+
         # Convert
         img = img[:, :, ::-1].transpose(2, 0, 1)  # BGR to RGB, to 3x416x416
         img = np.ascontiguousarray(img)
@@ -277,12 +260,12 @@ class Detection(object):
             img = img.unsqueeze(0)
 
         # Inference
-        time_synchronized()
-        pred_array = self.model(img, False)[0]
+        torch.cuda.synchronize()
+        pred_array = self.model_yolo(img, False)[0]
 
         # Apply NMS
         pred_array = non_max_suppression(pred_array, 0.25, 0.45)
-        time_synchronized()
+        torch.cuda.synchronize()
 
         pred_array = pred_array[0][:, -2:]
         pred = PredictRes()

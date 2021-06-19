@@ -12,7 +12,7 @@ class Detection(object):
 
     __slots__ = []
 
-    def __init__(self, weights, img_size=640):
+    def __init__(self):
         pass
 
     def detect(self, img):
