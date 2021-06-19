@@ -15,7 +15,6 @@ from . import database
 db = database.Database()
 
 
-
 class SubmitView(View):
 
     def post(self,request):
