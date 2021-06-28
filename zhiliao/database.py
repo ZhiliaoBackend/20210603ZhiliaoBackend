@@ -4,7 +4,7 @@ import pytz as tz
 from django.http.request import QueryDict
 
 from . import models
-from . import detect_debug as detect
+from . import detect
 
 
 class Task(object):
@@ -51,13 +51,13 @@ class Database(object):
     负责数据库的提交与更新
 
     属性:
-        request_range: float(second) 期望的考察范围，默认为60s
-        req_submit_interval_milisec: float(milisecond) 约定的提交间隔，默认为1000ms
+        request_range: float(second) 期望的考察范围，建议值为30s
+        req_submit_interval_milisec: float(milisecond) 约定的提交间隔，建议值为1000ms
     """
 
     __slots__ = ['req_eval_range', 'req_submit_interval_milisec']
 
-    def __init__(self, request_range=60, req_submit_interval_milisec=1000):
+    def __init__(self, request_range, req_submit_interval_milisec):
         self.req_eval_range = dt.timedelta(seconds=request_range)
         self.req_submit_interval_milisec = req_submit_interval_milisec
 
@@ -109,7 +109,7 @@ class Database(object):
 
         for record_old, record_new in pair_generator(records):  # 成对地取数据
             if record_old.record_time < request_eval_time:
-                # 当旧数据超出评估范围(60s)时，对数据库各项进行调整
+                # 当旧数据超出评估范围(30s)时，对数据库各项进行调整
                 time_interval = record_new.record_time - record_old.record_time
                 time_interval_milisec = int(time_interval.total_seconds() * 1000)
                 driver_base.eval_time_milisec -= time_interval_milisec
@@ -124,22 +124,35 @@ class Database(object):
                     else:
                         driver_base.mouth_abnormal_milisec -= (time_interval_milisec >> 1)
                 record_old.delete()
+        driver_base.save()
 
         # 计算分数
+        if driver_base.eval_time_milisec == 0:
+            return 0,0
         drive_time = dt.datetime.utcnow().replace(tzinfo=tz.utc) - driver_base.start_time  # 驾驶时长
         if drive_time < self.req_eval_range:
-            return 0
+            return 0,0
         drive_time_milisec = drive_time.total_seconds() * 1000
-        max_factor_time = 10000  # 驾驶时长因子在10s(10000ms)时达到最大
+        max_factor_time = 60000  # 驾驶时长因子在60s(60000ms)时达到最大
         drive_time_factor = (max_factor_time if drive_time_milisec > max_factor_time else drive_time_milisec) / max_factor_time
         yawn_time = driver_base.mouth_abnormal_milisec
         sleep_time = driver_base.eye_abnormal_milisec - driver_base.mouth_abnormal_milisec
         sleep_time = 0 if sleep_time < 0 else sleep_time
-        score = int((yawn_time / 0.5 + sleep_time / 0.2) / drive_time_milisec * 100 * drive_time_factor)
+        score = int((yawn_time / 0.6 + sleep_time / 0.3) / driver_base.eval_time_milisec * 100 * drive_time_factor)
         score = 100 if score > 100 else score
-        return score
 
-    def post_task(self,task:Task):
+        if score < 30:
+            level = 0
+        elif 30 <= score < 60:
+            level = 1
+        elif 60 <= score < 90:
+            level = 2
+        else:
+            level = 3
+
+        return score,level
+
+    def login(self):
         # 重置状态
         models.DriverDetect.objects.all().delete()
         models.DriverBase.objects.all().delete()
@@ -150,6 +163,8 @@ class Database(object):
                                         last_eye_abnormal=False,
                                         last_mouth_abnormal=False)
         driver_base.save()
+
+    def post_task(self,task:Task):
         # 推送任务
         task_orm = models.Task(ori_name=task.ori_name,ori_WE=task.ori_WE,ori_NS=task.ori_NS,dst_name=task.dst_name,dst_WE=task.dst_WE,dst_NS=task.dst_NS)
         task_orm.save()

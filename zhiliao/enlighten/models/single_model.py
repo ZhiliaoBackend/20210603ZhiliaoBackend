@@ -153,7 +153,7 @@ class SingleModel(BaseModel):
             self.fake_B = self.netG_A.forward(self.real_A, self.real_A_gray)
 
         #real_A = tensor2im(self.real_A.data)
-        fake_B = tensor2im(self.fake_B.data)[...,::-1]
+        fake_B = tensor2im(self.fake_B.data)
         #A_gray = atten2im(self.real_A_gray.data)
         return fake_B
 

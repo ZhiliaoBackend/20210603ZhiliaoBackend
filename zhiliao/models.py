@@ -11,19 +11,17 @@ class DriverBase(models.Model):
     last_eye_abnormal = models.BooleanField()  # 最后一次提交时眼部是否异常
     last_mouth_abnormal = models.BooleanField()  # 最后一次提交时嘴部是否异常
 
-
 class DriverDetect(models.Model):
     record_id = models.BigAutoField(primary_key=True)
     record_time = models.DateTimeField()  # 记录时间
     eye_abnormal = models.BooleanField(default=False)  # 眼部是否异常
     mouth_abnormal = models.BooleanField(default=False)  # 嘴部是否异常
 
-
 class Task(models.Model):
     task_id = models.BigAutoField(primary_key=True)
-    ori_name=models.CharField(max_length=32)  # 起点名称
-    ori_WE=models.DecimalField(max_digits=9,decimal_places=6)  # 起点经度
-    ori_NS=models.DecimalField(max_digits=9,decimal_places=6)  # 起点纬度
-    dst_name=models.CharField(max_length=32)  # 终点名称
-    dst_WE=models.DecimalField(max_digits=9,decimal_places=6)  # 终点经度
-    dst_NS=models.DecimalField(max_digits=9,decimal_places=6)  # 终点纬度
+    ori_name = models.CharField(max_length=32)  # 起点名称
+    ori_WE = models.DecimalField(max_digits=9,decimal_places=6)  # 起点经度
+    ori_NS = models.DecimalField(max_digits=9,decimal_places=6)  # 起点纬度
+    dst_name = models.CharField(max_length=32)  # 终点名称
+    dst_WE = models.DecimalField(max_digits=9,decimal_places=6)  # 终点经度
+    dst_NS = models.DecimalField(max_digits=9,decimal_places=6)  # 终点纬度

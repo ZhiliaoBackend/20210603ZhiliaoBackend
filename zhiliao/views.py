@@ -1,5 +1,6 @@
 import numpy as np
 from PIL import Image
+import cv2 as cv
 from io import BytesIO
 
 import traceback
@@ -8,11 +9,11 @@ from django.http import JsonResponse
 from django.views import View
 
 #from .  import detect
-from . import detect_debug as detect
+from . import detect
 detection = detect.Detection()
 
 from . import database
-db = database.Database()
+db = database.Database(30,1000)
 
 
 class SubmitView(View):
@@ -22,10 +23,11 @@ class SubmitView(View):
         exception = None
         try:
             img_obj = request.FILES['image']
-            img = np.array(Image.open(BytesIO(img_obj.read())))
+            img = np.array(Image.open(BytesIO(img_obj.read())))[:, :, ::-1]
             pred = detection.detect(img)
             res_dict['eye_abnormal'] = pred.eye_abnormal
             res_dict['mouth_abnormal'] = pred.mouth_abnormal
+            print(res_dict)
             db.submit(pred)
         except Exception as err:
             traceback.print_exc()
@@ -50,7 +52,19 @@ class DriverView(View):
         res_dict = dict()
         exception = None
         try:
-            res_dict['tired_score'] = db.get_tired_score()
+            tired_score,tired_level=db.get_tired_score()
+            res_dict['tired_score'] = tired_score
+            res_dict['tired_level'] = tired_level
+        except Exception as err:
+            traceback.print_exc()
+            exception = err
+        return self.handle_exception(res_dict,exception)
+
+    def post(self,request):
+        res_dict = dict()
+        exception = None
+        try:
+            db.login()
         except Exception as err:
             traceback.print_exc()
             exception = err

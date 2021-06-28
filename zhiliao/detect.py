@@ -161,9 +161,8 @@ class PredictRes(object):
     __slots__ = ['eye_abnormal','mouth_abnormal']
 
     def __init__(self):
-        self.eye_abnormal = None  # True if eye is closed
-        self.mouth_abnormal = None  # True if mouth is opened
-
+        self.eye_abnormal = False  # True if eye is closed
+        self.mouth_abnormal = False  # True if mouth is opened
 
 class Detection(object):
 
@@ -269,6 +268,8 @@ class Detection(object):
 
         pred_array = pred_array[0][:, -2:]
         pred = PredictRes()
+        if len(pred_array) == 0:
+            raise ValueError("No face in the image!")
         for confidence,idx in pred_array:
             idx = int(idx)
             if idx == 0:
